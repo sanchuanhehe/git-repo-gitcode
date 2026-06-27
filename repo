@@ -121,10 +121,14 @@ if __name__ == "__main__":
 #
 REPO_URL = os.environ.get("REPO_URL", None)
 if not REPO_URL:
-    REPO_URL = "https://gerrit.googlesource.com/git-repo"
+    REPO_URL = "https://github.com/sanchuanhehe/git-repo-gitcode"
 REPO_REV = os.environ.get("REPO_REV")
 if not REPO_REV:
-    REPO_REV = "stable"
+    # Signed release of this fork (GitCode integration on top of upstream
+    # v2.64). The tag is GPG-signed with the maintainer key in
+    # MAINTAINER_KEYS below, so `repo init` verifies it like an upstream
+    # release.
+    REPO_REV = "v2.64-gitcode.1"
 # URL to file bug reports for repo tool issues.
 BUG_URL = "https://issues.gerritcodereview.com/issues/new?component=1370071"
 
@@ -132,7 +136,7 @@ BUG_URL = "https://issues.gerritcodereview.com/issues/new?component=1370071"
 VERSION = (2, 54)
 
 # increment this if the MAINTAINER_KEYS block is modified
-KEYRING_VERSION = (2, 3)
+KEYRING_VERSION = (2, 4)
 
 # Each individual key entry is created by using:
 # gpg --armor --export keyid
@@ -208,6 +212,38 @@ MEkA/3uLmiwANOcgE0zB9zga0T/KkYhYOWFx7zRyDhrTf9spAPwIfSBOAGtwxjLO
 DCce5OaQJl/YuGHvXq2yx5h7T8pdAZ+PAJ4qfIk2LLSidsplTDXOKhOQAuOqUQCf
 cZ7aFsJF4PtcDrfdejyAxbtsSHI=
 =82Tj
+-----END PGP PUBLIC KEY BLOCK-----
+
+     sanchuanhehe (git-repo-gitcode release key) <wyihe5220@gmail.com>
+-----BEGIN PGP PUBLIC KEY BLOCK-----
+
+mQINBGo/6swBEADHV+TtakxNxued1i6QDBUdLNuRxtANACm+f4Sxdn/2yDqYXoAo
+MhabMqDETQkTn0ywEBW1jWXBBRmqiWfjGq8Hkf231+8Bg+2Ys14102Yxh9ZI6iqS
+RFIs1Kpic13t2d1wk1vPaaHihX5Mv1gjJmKnYRk1kBAEXK6J/2W0+pb2hRDWVFcL
+bBY3368RYRLZM0xxkoPw1gtZQJKV7PiVsBKt+N42sZzNC9Z3mUyXIOy/HfinqUYp
+4BZzo2gAQwY1tKwFXirGDoRymB9sk1dvCjkyMRiFI7PqzNL4S7bHDpNreFZNkw2q
+xDpR2SC0qfYp/uoLNC4QO5ippwt2D09Wa5PlWkSxbtrxH5NEvkb4lplAg/pTZJpg
+fqmBcx534pfpSNXIuAO8xSyvSgWod1ZaIuA7pWnXUyP8k9b0deS4BDNSFa7Ne496
+M1wYMzq0bAP64K99/EERm6XZH5ZpCD97yUJO9nmHeTBwY1Dt6YxOtVybio8LR692
+FAxOK9UwSZlu9cr45j71vxCb1b4N4CnpsD4l4+bpPzGMF3oFR59CmV0nzasLcRtS
+W+kFxJhzLrWdbmnuL1D0FZY4p7uE6bNwaXHm5kkCNV564V1qQ0HM4xQ6URBDi2K5
+Cqm1W9mgxHIRBS5jYSBPs20w+jSqScqfyHGTP1FYRCJa3B94sos9/By7VQARAQAB
+tEFzYW5jaHVhbmhlaGUgKGdpdC1yZXBvLWdpdGNvZGUgcmVsZWFzZSBrZXkpIDx3
+eWloZTUyMjBAZ21haWwuY29tPokCbQQTAQgAVxYhBLsP5/HmAucidpj2x0HHILh0
+Hmj2BQJqP+rMGxSAAAAAAAQADm1hbnUyLDIuNSsxLjEyLDAsMwIbAwULCQgHAgIi
+AgYVCgkICwIEFgIDAQIeBwIXgAAKCRBBxyC4dB5o9tK8D/9LwUv9Wu4TAyf+w5Kt
+t2pmN4TN3ZADQQvcXQXqscU9uIhvnmPD2zvALKIFqnzeNCYC/LMxanmF+erHSeJE
+1NxCihy3SYUx9qnsOrWnmVb9uuKC9LO42btfBuG72C9W/6AyQx8AK+NPkfciOen2
+OrsABh3OfHEDnwU/EqYMLYcc+t2JLw3CBOe0kHYOybj7vUd81mFS11EF3eBTU067
+xdInjViGM7+hAQIpQHplhc7Hjlr+9Aw4yExh+qP6W18G6JNgftKhwq7EiTpd2/Ia
+62jCg3nrnHWCnm7+JA/AhNy8wO0niez3Hlr3prN/uE6l97dpAiD+o4bEb30yOgj4
+tvrW2IW2AwbnHaTOIiDCv8QPvaGV9bLfiyaAhvF4cENtXB9pYMnEIVqLDP5d1XP0
+1Gik9V92qDpa88GJRrB3Cvncgx65sur3ob152Ab4EuCguj4HTIlYRcmF1kPdG2Uz
+Ro7ciJbn7Tz1zuS3YPDN0s6LKGuwbHv8rhZjatWglHzcJ6Rbo8ll59ZeFJjXfpBF
+kF9RKc0zM7SeAjNtykpn3Zd7/SqsJF7qMj0gRWxQo9xea/sPF8tVcAlK4M2VbcDn
+NSZ9QhSiitjacj7LkUoGIcSu2DOddMoIJyOod5tO9gWFsRSCrRFCz2OYJOiCpVLZ
+FHzk+UK6XN0QF4EO76c6++gl8A==
+=Ew73
 -----END PGP PUBLIC KEY BLOCK-----
 """
 
