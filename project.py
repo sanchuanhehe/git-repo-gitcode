@@ -31,14 +31,18 @@ import time
 from typing import List, NamedTuple, Optional
 import urllib.parse
 
+import requests
+
 from color import Coloring
 from error import DownloadError
+from error import ForkProjectError
 from error import GitAuthError
 from error import GitError
 from error import ManifestInvalidPathError
 from error import ManifestInvalidRevisionError
 from error import ManifestParseError
 from error import NoManifestException
+from error import PullRequestError
 from error import RepoError
 from error import UploadError
 import fetch
@@ -61,7 +65,11 @@ import platform_utils
 import progress
 from repo_logging import RepoLogger
 from repo_trace import Trace
-
+from settings import GITCODE_PR_V3_API
+from settings import GITCODE_PR_V5_API
+from settings import GITCODE_SSH
+from settings import GITCODE_USER_API
+from settings import TIMEOUT
 
 logger = RepoLogger(__file__)
 
@@ -296,7 +304,7 @@ class ReviewableBranch:
         )
         for line in output.split("\n"):
             try:
-                (sha, ref) = line.split()
+                sha, ref = line.split()
                 refs[sha] = ref
             except ValueError:
                 pass
@@ -1105,6 +1113,208 @@ class Project:
             if rb.commits:
                 return rb
         return None
+
+    def GetPushableBranch(self, branch_name):
+        """Get a single pushable branch, or None.
+
+        Unlike GetUploadableBranch this does not require local commits, so a
+        freshly created branch can still be pushed (e.g. to open a new
+        feature branch on the GitCode server).
+        """
+        branch = self.GetBranch(branch_name)
+        base = branch.LocalMerge
+        if branch.LocalMerge:
+            return ReviewableBranch(self, branch, base)
+        return None
+
+    def UploadNoReview(self, opt, peoples, branch=None):
+        """Push the named branch directly to the GitCode server.
+
+        Used by ``repo push`` when no Gerrit review server is defined.
+        """
+        if branch is None:
+            branch = self.CurrentBranch
+        if branch is None:
+            raise GitError("not currently on a branch", project=self.name)
+
+        branch = self.GetBranch(branch)
+        if not branch.LocalMerge:
+            raise GitError(
+                "branch %s does not track a remote" % branch.name,
+                project=self.name,
+            )
+
+        if opt.new_branch:
+            dest_branch = branch.name
+        else:
+            dest_branch = branch.merge
+
+        if dest_branch.startswith(R_TAGS):
+            raise GitError(
+                "Can not push to TAGS (%s)! Run repo push with --new flag "
+                "to create new feature branch." % dest_branch
+            )
+        if not dest_branch.startswith(R_HEADS):
+            dest_branch = R_HEADS + dest_branch
+
+        if not branch.remote.projectname:
+            branch.remote.projectname = self.name
+            branch.remote.Save()
+
+        # save git config branch.name.merge
+        if opt.new_branch:
+            branch.merge = dest_branch
+            branch.Save()
+
+        ref_spec = "%s:%s" % (R_HEADS + branch.name, dest_branch)
+        config = self.manifest.manifestProject.config
+        pushurl = config.GetString("repo.%s.pushurl" % branch.remote.name)
+        if not pushurl:
+            pushurl = config.GetString("repo.pushurl")
+        if not pushurl:
+            html_url = self._UserUrl.rstrip("/") + "/"
+            namespace = self._GitcodeNamespace(html_url, type="upload")
+            pushurl = ":".join([GITCODE_SSH, namespace])
+            config.SetString("repo.pushurl", pushurl)
+        pushurl = pushurl.rstrip("/") + "/" + self.name
+
+        cmd = ["push"]
+        if opt.force:
+            cmd.append("--force")
+        cmd.append(pushurl)
+        cmd.append(ref_spec)
+
+        if GitCommand(self, cmd).Wait() != 0:
+            raise UploadError("Upload failed")
+
+        if branch.LocalMerge and branch.LocalMerge.startswith("refs/remotes"):
+            self.bare_git.UpdateRef(branch.LocalMerge, R_HEADS + branch.name)
+
+    def PullRequest(self, opt, branch, peoples):
+        """Open a pull request on GitCode for the pushed branch.
+
+        Uses the GitCode v5 REST API. The owner namespace is derived from the
+        project's remote url and the token is read from repo.token.
+        """
+        if opt.dest_branch:
+            base_branch = opt.dest_branch
+        elif self.revisionExpr:
+            base_branch = self.revisionExpr
+        else:
+            base_branch = self.manifest.default.revisionExpr
+
+        namespace = self._GitcodeNamespace()
+        token = self.manifest.manifestProject.config.GetString("repo.token")
+        if not token:
+            token = GitConfig.ForUser().GetString("repo.token")
+            if not token:
+                raise PullRequestError(
+                    "repo.token is None, Please set it before pushing, you "
+                    "need `repo config -h`"
+                )
+
+        post_url = "/".join([GITCODE_PR_V5_API, namespace, self.name, "pulls"])
+        pushurl = self.manifest.manifestProject.config.GetString("repo.pushurl")
+        if not pushurl:
+            head = branch
+        else:
+            pushurl = pushurl.rstrip("/") + "/"
+            head = ":".join([self._GitcodeNamespace(pushurl), branch])
+
+        payload = {
+            "title": opt.title or "Gitcode Review - {}".format(branch),
+            "head": head,
+            "base": base_branch,
+            "assignees": ",".join(peoples),
+        }
+        if opt.content:
+            payload["description"] = opt.content
+        try:
+            r = requests.post(
+                post_url + "?access_token=" + token,
+                json=payload,
+                timeout=TIMEOUT,
+            )
+        except requests.exceptions.RequestException as e:
+            raise PullRequestError("requests error: %s" % e)
+
+        r_j = r.json()
+        if r.status_code != 200:
+            error_message = r_j["error_message"]
+            raise PullRequestError(
+                "pull request %s  code :%s  error: %s"
+                % (post_url, r.status_code, error_message)
+            )
+        return r_j["web_url"]
+
+    def ForkProject(self, token=None):
+        """Fork this project on GitCode, returning (status_code, body)."""
+        if not token:
+            token = self.manifest.manifestProject.config.GetString("repo.token")
+            if not token:
+                token = GitConfig.ForUser().GetString("repo.token")
+                if not token:
+                    raise ForkProjectError(
+                        "repo.token is None, Please set it before pushing, "
+                        "you need `repo config -h`"
+                    )
+        namespace = self._GitcodeNamespace(type="forkproject")
+        project_id = "%2F".join([namespace, self.name])
+        post_url = "/".join([GITCODE_PR_V3_API, project_id, "fork"])
+        headers = {"private-token": token}
+        try:
+            r = requests.post(
+                post_url, json={}, headers=headers, timeout=TIMEOUT
+            )
+        except requests.exceptions.RequestException as e:
+            raise ForkProjectError("requests error: %s" % e)
+        return r.status_code, r.json()
+
+    def _GitcodeNamespace(self, url=None, type="pullrequest"):
+        """Extract the owner namespace from a GitCode remote url."""
+        check_url = url if url is not None else self.remote.url
+        name1 = re.match(r"^git@gitcode.com:(.*?)/.*", check_url)
+        name2 = re.match(r"^https://.*gitcode.com/(.*?)/.*", check_url)
+        if name1:
+            return name1.group(1)
+        elif name2:
+            return name2.group(1)
+        else:
+            if type == "pullrequest":
+                raise PullRequestError(
+                    "remote.url: %s doesn't belong to gitcode" % check_url
+                )
+            elif type == "forkproject":
+                raise ForkProjectError(
+                    "remote.url: %s doesn't belong to gitcode" % check_url
+                )
+            else:
+                raise UploadError(
+                    "remote.url: %s doesn't belong to gitcode" % check_url
+                )
+
+    @property
+    def _UserUrl(self):
+        """Return the authenticated user's html_url via the GitCode API."""
+        token = self.manifest.manifestProject.config.GetString("repo.token")
+        if not token:
+            token = GitConfig.ForUser().GetString("repo.token")
+            if not token:
+                raise UploadError(
+                    "repo.token is None, Please set it, you need "
+                    "`repo config -h`"
+                )
+        try:
+            r = requests.get(
+                GITCODE_USER_API,
+                params={"access_token": token},
+                timeout=TIMEOUT,
+            )
+        except requests.exceptions.RequestException as e:
+            raise UploadError("requests error: %s" % e)
+        if r.status_code != 200:
+            raise UploadError("repo.token is Error, Please reset")
+        return r.json()["html_url"]
 
     def UploadForReview(
         self,
@@ -3072,7 +3282,7 @@ class Project:
                 except OSError:
                     return False
 
-            (output, _) = proc.communicate()
+            output, _ = proc.communicate()
             curlret = proc.returncode
 
             if curlret in (22, 35, 56, 92):

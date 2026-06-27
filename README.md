@@ -12,6 +12,7 @@ that you can put anywhere in your path.
 * Source: <https://gerrit.googlesource.com/git-repo/>
 * Overview: <https://source.android.com/source/developing.html>
 * Docs: <https://source.android.com/source/using-repo.html>
+* [GitCode fork commands](./docs/gitcode.md)
 * [repo Manifest Format](./docs/manifest-format.md)
 * [repo Hooks](./docs/repo-hooks.md)
 * [Contributing](./CONTRIBUTING.md)
