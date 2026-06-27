@@ -133,6 +133,28 @@ class DownloadError(RepoExitError):
         return self.reason
 
 
+class PullRequestError(RepoError):
+    """Creating a pull request on GitCode did not succeed."""
+
+    def __init__(self, reason, **kwargs):
+        super().__init__(reason, **kwargs)
+        self.reason = reason
+
+    def __str__(self):
+        return self.reason
+
+
+class ForkProjectError(RepoError):
+    """Forking a project on GitCode did not succeed."""
+
+    def __init__(self, reason, **kwargs):
+        super().__init__(reason, **kwargs)
+        self.reason = reason
+
+    def __str__(self):
+        return self.reason
+
+
 class InvalidArgumentsError(RepoExitError):
     """Invalid command Arguments."""
 
