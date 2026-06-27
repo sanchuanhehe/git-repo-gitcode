@@ -12,6 +12,45 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "git-repo-gitcode"
+version = "2.64.0"
+description = "Repo helps manage many Git repositories (GitCode fork)"
+readme = "README.md"
+requires-python = ">=3.6"
+license = { text = "Apache-2.0" }
+maintainers = [{ name = "GitCode" }]
+# The GitCode-specific commands (`repo push`, `repo gitcode_pr`) call the
+# GitCode REST API with requests, so it must be present in the environment the
+# launcher execs main.py in.
+dependencies = ["requests"]
+classifiers = [
+    "Development Status :: 6 - Mature",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: MacOS :: MacOS X",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Topic :: Software Development :: Version Control :: Git",
+]
+
+[project.urls]
+Homepage = "https://github.com/sanchuanhehe/git-repo-gitcode"
+
+# Install the standalone `repo` launcher as a console command. uv exposes it on
+# PATH after `uv tool install .`; setuptools rewrites the shebang to the
+# install environment's python (which carries the requests dependency).
+[tool.setuptools]
+script-files = ["repo"]
+packages = []
+py-modules = []
+
 [tool.black]
 line-length = 80
 target-version = ['py36', 'py37', 'py38', 'py39', 'py310', 'py311'] #, 'py312'
